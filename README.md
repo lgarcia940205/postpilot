@@ -31,18 +31,19 @@ PostPilot no compite con la inteligencia de ChatGPT; actúa como una **capa de f
 Si deseas correr PostPilot en tu entorno local, sigue estos pasos:
 
 1. **Clona el repositorio:**
-   Usa el comando git clone con la dirección de tu repositorio.
+   Usa el comando git clone
+   git clone https://github.com/lgarcia940205/postpilot.git
 
-2. **Instala las dependencias:**
+3. **Instala las dependencias:**
    npm install
 
-3. **Configura las variables de entorno:**
+4. **Configura las variables de entorno:**
    Crea un archivo .env en la raíz del proyecto basándote en el archivo de ejemplo (asegúrate de no subir nunca tu .env a GitHub).
 
    VITE_GEMINI_API_KEY=tu_llave_de_google_ai_studio_aqui
    VITE_FIREBASE_CONFIG={tu_configuracion_de_firebase_aqui}
 
-4. **Inicia el servidor de desarrollo:**
+5. **Inicia el servidor de desarrollo:**
    npm run dev
 
 ---
