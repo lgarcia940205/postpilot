@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Sparkles, Copy, Loader2, Send, Linkedin, Twitter, FileText, 
+  Sparkles, Copy, Loader2, Send, FileText, 
   History, Trash2, Image as ImageIcon, Settings, User, Key, 
-  Save, X, CheckCircle2, TrendingUp, Download, Facebook, 
+  Save, X, CheckCircle2, TrendingUp, Download, 
   Video, Clapperboard, MonitorPlay
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp, deleteDoc, doc, setDoc, getDoc } from 'firebase/firestore';
+import Header from './components/layout/Header';
 
 // --- CONFIGURACIÓN ---
-const apiKey = ""; 
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || ""; 
 
 let app, auth, db, appId;
 try {
@@ -164,7 +165,7 @@ export default function App() {
 
   const generateTrendingIdea = async () => {
     setLoadingSuggestion(true);
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey || activeKey}`;
     
     let nicheContext = "tecnología, innovación o creadores de contenido"; 
     if (history.length > 0) {
@@ -178,7 +179,7 @@ export default function App() {
           text: `Busca en internet noticias de las últimas 24 horas sobre ${nicheContext}. Basado EXCLUSIVAMENTE en una noticia real y actual de ese nicho específico, sugiere 1 título atractivo para crear contenido en redes sociales. Idioma: ${lang === 'es' ? 'Español' : 'Inglés'}. Máximo 10 palabras. SOLO DEVUELVE EL TÍTULO.` 
         }] 
       }],
-      tools: [{ google_search: {} }] 
+      tools: [{ googleSearch: {} }] // <--- EL CAMBIO CRÍTICO ESTÁ AQUÍ
     };
 
     try {
@@ -214,7 +215,7 @@ export default function App() {
     `;
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey || activeKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey || activeKey}`;
       const payload = {
         contents: [{ parts: [{ text: "Genera el contenido solicitado." }] }],
         systemInstruction: { parts: [{ text: systemInstruction }] }
@@ -302,23 +303,7 @@ export default function App() {
 
       <div className="max-w-[1200px] mx-auto space-y-6">
         
-        <header className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 lg:p-5 rounded-2xl shadow-sm border border-slate-100">
-          <div className="flex items-center gap-4">
-            <div className="bg-blue-100 p-3 rounded-2xl"><Sparkles className="w-7 h-7 text-blue-600" /></div>
-            <div>
-              <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">{t.appTitle}</h1>
-              <p className="text-slate-500 text-sm hidden sm:block">{t.appSubtitle}</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              <button onClick={() => setLang('es')} className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${lang === 'es' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}>ES</button>
-              <button onClick={() => setLang('en')} className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${lang === 'en' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}>EN</button>
-            </div>
-            <button onClick={() => setShowSettings(true)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"><Settings className="w-5 h-5"/></button>
-          </div>
-        </header>
+        <Header lang={lang} setLang={setLang} setShowSettings={setShowSettings} t={t} />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
