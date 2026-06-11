@@ -20,9 +20,13 @@ PostPilot no compite con la inteligencia de ChatGPT; actúa como una **capa de f
 
 ## 🛠️ Stack Tecnológico
 
-- **Frontend:** React.js, Tailwind CSS (para un diseño limpio y accesible), Lucide Icons.
-- **Backend / BaaS:** Firebase (Authentication, Firestore para almacenamiento en la nube).
-- **IA & APIs:** Google Generative AI (Gemini 2.5, Imagen 4), Integración base para OpenAI/DeepSeek.
+* **Frontend:** React 18 + Vite
+* **Estilos:** Tailwind CSS
+* **Iconografía:** Lucide React
+* **Notificaciones:** React Hot Toast (Manejo defensivo de UI)
+* **Persistencia de Datos:** Google Cloud Firestore (Firebase)
+* **Inteligencia Artificial:** API REST de Google Gemini 2.5 Flash
+* **Recursos Visuales:** Picsum Photos API (Generación de placeholders deterministas)
 
 ---
 
@@ -38,10 +42,15 @@ Si deseas correr PostPilot en tu entorno local, sigue estos pasos:
    npm install
 
 4. **Configura las variables de entorno:**
-   Crea un archivo .env en la raíz del proyecto basándote en el archivo de ejemplo (asegúrate de no subir nunca tu .env a GitHub).
+   Para ejecutar este proyecto en local, debes crear un archivo `.env` en la raíz con la siguiente estructura estricta:
 
-   VITE_GEMINI_API_KEY=tu_llave_de_google_ai_studio_aqui
-   VITE_FIREBASE_CONFIG={tu_configuracion_de_firebase_aqui}
+   \`\`\`env
+   # API Key de AI Studio para inferencia de texto
+   VITE_GEMINI_API_KEY=tu_api_key_aqui
+
+   # Objeto JSON estricto de configuración de Firebase (DEBE ir en una sola línea, sin comillas simples envolventes ni punto y coma al final)
+   VITE_FIREBASE_CONFIG={"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}
+   \`\`\`
 
 5. **Inicia el servidor de desarrollo:**
    npm run dev
@@ -56,6 +65,13 @@ PostPilot es un proyecto en evolución continua. Estas son las características 
 - [ ] **Gestor de Hilos (Threads):** Renderizado de UI específico para dividir contenido largo en hilos de Twitter.
 - [ ] **Migración de Estado a Zustand:** Refactorización del estado global para mejorar el rendimiento.
 - [ ] **Paginación en Firestore:** Optimización de lectura de historial con limit() y carga perezosa.
+
+---
+
+## 🧠 Arquitectura de Prompts y Datos
+
+* **Tags de Nicho:** Para evitar la "contaminación de contexto" (*Prompt Pollution*), la aplicación no envía el historial completo a la IA. Utiliza un sistema determinista de Tags seleccionables (ej. "Desarrollo Backend") que se inyectan como parámetros aislados en la herramienta de búsqueda (`googleSearch`) para generar tendencias altamente precisas y reducir el consumo de tokens.
+* **Manejo de Tasa de Peticiones (Rate Limiting):** El cliente incluye intercepción de errores HTTP 429 para manejar elegantemente los límites del *Free Tier* de Google mediante notificaciones asíncronas, protegiendo la UI de colapsos.
 
 ---
 
