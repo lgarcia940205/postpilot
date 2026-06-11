@@ -8,13 +8,12 @@ PostPilot no compite con la inteligencia de ChatGPT; actúa como una **capa de f
 
 ## ✨ Características Principales (Features)
 
-- 🧠 **Arquitectura BYOK (Bring Your Own Key):** Sistema multi-modelo que permite a los usuarios conectar sus propias llaves de Gemini, OpenAI o DeepSeek de forma segura. Escalabilidad infinita con cero costos de tokens para el host.
 - 🎭 **System Prompting Inyectable (Identidad Base):** Configura tu tono, estilo y reglas de formato una sola vez. La plataforma lo inyectará dinámicamente en todas tus interacciones para que la IA no suene como un robot.
 - 📈 **Tendencias Contextuales (Context-Aware RAG):** Usando el historial de tus publicaciones, el motor busca noticias de las últimas 24 horas *específicas de tu nicho* para sugerirte de qué hablar hoy.
 - 🎬 **Multi-Formato Inteligente:** Genera posts estructurados para LinkedIn/Twitter o Libretos de Video de doble columna (Audio/Visual) adaptados para TikTok o YouTube Shorts.
-- 🎨 **Generación de Activos Visuales:** Integración con el modelo Imagen de Google para crear ilustraciones corporativas flat-design que acompañen tus posts de texto.
-- 🌍 **Soporte i18n (Internacionalización):** Interfaz totalmente accesible con soporte nativo para Español e Inglés, fácilmente escalable a más idiomas.
-- 💾 **Memoria Histórica (Firebase):** Base de datos no relacional que guarda tus temas anteriores para evitar repeticiones y dar contexto continuo a la IA.
+- 🎨 **Simulación de Activos Visuales:** Integración asíncrona con APIs de placeholders deterministas (Picsum) para simular el flujo de generación visual en la UI, manteniendo el MVP ágil y con cero costos de inferencia gráfica.
+- 🌍 **Soporte i18n (Internacionalización):** Interfaz totalmente accesible con soporte nativo para Español e Inglés, fácilmente escalable a más idiomas, gestionada mediante estado derivado y caché sincrónico sin librerías de terceros.
+- 💾 **Memoria Histórica (Firebase):** Base de datos no relacional que guarda tus temas anteriores para evitar repeticiones, aislada estrictamente por UID mediante índices compuestos.
 
 ---
 
@@ -35,24 +34,24 @@ PostPilot no compite con la inteligencia de ChatGPT; actúa como una **capa de f
 Si deseas correr PostPilot en tu entorno local, sigue estos pasos:
 
 1. **Clona el repositorio:**
-   Usa el comando git clone
-   git clone https://github.com/lgarcia940205/postpilot.git
+```bash
+   git clone [https://github.com/lgarcia940205/postpilot.git](https://github.com/lgarcia940205/postpilot.git)
+Instala las dependencias:
 
-3. **Instala las dependencias:**
+```bash
    npm install
+Configura las variables de entorno:
+Para ejecutar este proyecto en local, debes crear un archivo .env en la raíz con la siguiente estructura estricta:
 
-4. **Configura las variables de entorno:**
-   Para ejecutar este proyecto en local, debes crear un archivo `.env` en la raíz con la siguiente estructura estricta:
+Fragmento de código
+# API Key de AI Studio para inferencia de texto
+VITE_GEMINI_API_KEY=tu_api_key_aqui
 
-   ```env
-   # API Key de AI Studio para inferencia de texto
-   VITE_GEMINI_API_KEY=tu_api_key_aqui
+# Objeto JSON estricto de configuración de Firebase (DEBE ir en una sola línea, sin comillas simples envolventes ni punto y coma al final)
+VITE_FIREBASE_CONFIG={"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}
+Inicia el servidor de desarrollo:
 
-   # Objeto JSON estricto de configuración de Firebase (DEBE ir en una sola línea, sin comillas simples envolventes ni punto y coma al final)
-   VITE_FIREBASE_CONFIG={"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}
-   ```
-
-5. **Inicia el servidor de desarrollo:**
+```bash
    npm run dev
 
 ---
@@ -75,9 +74,20 @@ PostPilot es un proyecto en evolución continua. Estas son las características 
 
 ---
 
-## 🤝 Contribuciones
+## 🛠️ Decisiones de Ingeniería y Optimización
 
-¡Las contribuciones son bienvenidas! Si tienes ideas para mejorar PostPilot, siéntete libre de hacer un fork del repositorio y enviar un Pull Request.
+### 1. Persistencia Parcial y Parcheo Defensivo
+Para la actualización de preferencias de usuario (idioma y contexto de personalidad), se implementó una mutación de red tipo `PATCH` utilizando la directiva `{ merge: true }` de Firestore. Esto evita la sobreescritura accidental de metadatos críticos del perfil de autenticación (`email`, `createdAt`) durante las actualizaciones visuales de la interfaz.
+
+### 2. Optimización del Árbol de Renderizado (i18n)
+Se evitó el uso de librerías externas de internacionalización pesadas para mantener el bundle size optimizado. Las traducciones se gestionan mediante un diccionario estático desacoplado del core del cliente, inyectando propiedades de forma unidireccional y calculando las variantes del texto mediante lógica derivada, reduciendo los ciclos de re-renderizado innecesarios en componentes hijos como `ActionPanel` y `OutputCanvas`.
+
+### 3. Mitigación de Errores Asíncronos de Red
+La integración con la API REST de Gemini-2.5-Flash cuenta con un bloque interceptor de excepciones que traduce los códigos de estado HTTP (como el error 429 de superación de cuotas o caídas de red) en respuestas comprensibles para el usuario a través de componentes de notificación asíncronos (`react-hot-toast`), garantizando que la aplicación no falle en silencio ante caídas del servidor de IA.
+
+## 🤝 Contribuciones
+Este proyecto fue desarrollado como un caso de estudio técnico y arquitectónico. Para mantener la integridad y trazabilidad de la autoría original frente a evaluaciones técnicas, actualmente no se aceptan Pull Requests.
+Sin embargo, eres completamente libre de hacer un fork del repositorio, clonarlo y experimentar con el código para tus propios proyectos bajo los términos de la Licencia MIT.
 
 ## 📄 Licencia
 
