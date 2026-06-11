@@ -44,13 +44,13 @@ Si deseas correr PostPilot en tu entorno local, sigue estos pasos:
 4. **Configura las variables de entorno:**
    Para ejecutar este proyecto en local, debes crear un archivo `.env` en la raíz con la siguiente estructura estricta:
 
-   \`\`\`env
+   ```env
    # API Key de AI Studio para inferencia de texto
    VITE_GEMINI_API_KEY=tu_api_key_aqui
 
    # Objeto JSON estricto de configuración de Firebase (DEBE ir en una sola línea, sin comillas simples envolventes ni punto y coma al final)
    VITE_FIREBASE_CONFIG={"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}
-   \`\`\`
+   ```
 
 5. **Inicia el servidor de desarrollo:**
    npm run dev
