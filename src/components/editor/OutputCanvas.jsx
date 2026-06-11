@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Loader2, CheckCircle2, Copy, Image as ImageIcon, Download } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -15,6 +15,19 @@ export default function OutputCanvas({
   generatedImage,
   imageError
 }) {
+
+  const outputRef = useRef(null);
+
+  // FIX: 2. Efecto secundario defensivo para auto-scroll móvil
+  useEffect(() => {
+    // Si hay borrador, ya terminó de cargar, y es pantalla móvil (< 1024px)
+    if (draft && !loadingDraft && window.innerWidth < 1024) {
+      // Usamos un timeout de 100ms para asegurar que React ya pintó el componente condicional
+      setTimeout(() => {
+        outputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [draft, loadingDraft]); // El efecto reacciona a los cambios en estas variables
 
   const handleDownload = async () => {
     if (!generatedImage) return;
@@ -36,17 +49,15 @@ export default function OutputCanvas({
       window.URL.revokeObjectURL(url); // Liberar memoria
     } catch (error) {
       console.error("Error descargando la imagen:", error);
-      // Opcional: Si tienes acceso a toast.error prop, úsalo aquí
       alert("No se pudo iniciar la descarga. Verifica tu conexión.");
     }
   };
 
   const handleCopy = async () => {
-    // Si no hay texto generado, abortamos silenciosamente
-    if (!generatedDraft) return; 
+    if (!draft) return; 
     
     try {
-      await navigator.clipboard.writeText(generatedDraft);
+      await navigator.clipboard.writeText(draft);
       toast.success("¡Texto copiado al portapapeles!");
     } catch (err) {
       console.error("Error al copiar:", err);
@@ -55,15 +66,16 @@ export default function OutputCanvas({
   };
 
   return (
-    <div className="lg:col-span-7 flex flex-col gap-6">
+    <div ref={outputRef} className={`lg:col-span-7 flex-col gap-6 order-1 lg:order-none ${!draft && !loadingDraft ? 'hidden lg:flex' : 'flex'}`}>
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 h-[500px] flex flex-col relative overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
            <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+             {/* FIX: Le quitamos las clases de scrollbar al punto de estado */}
              <div className={`w-2.5 h-2.5 rounded-full ${loadingDraft ? 'bg-amber-400 animate-pulse' : draft ? 'bg-green-500' : 'bg-slate-300'}`}></div>
              {t.resultTitle}
            </h2>
            {draft && !loadingDraft && (
-             <button onClick={handleCopy} className="text-sm font-bold bg-slate-800 text-white hover:bg-slate-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm">
+             <button onClick={handleCopy} className="text-sm font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 px-4 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm">
                {copied ? <CheckCircle2 className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />} {copied ? t.btnCopied : t.btnCopy}
              </button>
            )}
@@ -75,9 +87,17 @@ export default function OutputCanvas({
                <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
                <p className="text-base font-semibold text-slate-600">{t.loadingThinking}</p>
             </div>
+          ) : !draft ? (
+            /* FIX: Estado vacío elegante para escritorio */
+            <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-3">
+              <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                 <span className="text-xl opacity-50">✍️</span>
+              </div>
+              <p className="text-sm font-medium">El lienzo está en blanco</p>
+            </div>
           ) : (
             <textarea 
-              className={`w-full flex-1 bg-transparent border-none resize-none focus:ring-0 leading-relaxed text-base custom-scrollbar ${formatType === 'video' ? 'font-mono text-slate-600 text-sm' : 'font-sans text-slate-700'}`} 
+              className={`w-full flex-1 bg-transparent border-none resize-none focus:ring-0 leading-relaxed text-base custom-scrollbar scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent ${formatType === 'video' ? 'font-mono text-slate-600 text-sm' : 'font-sans text-slate-700'}`} 
               value={draft} 
               onChange={(e) => setDraft(e.target.value)} 
               readOnly={!draft}
@@ -98,7 +118,7 @@ export default function OutputCanvas({
             {imageError && <p className="text-xs text-red-500 font-medium">{imageError}</p>}
           </div>
 
-          <div className="w-full sm:w-2/3">
+          <div className="w-full sm:flex-1">
             <div className="w-full aspect-video bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden relative group">
               {loadingImage ? (
                 <div className="text-blue-500 flex flex-col items-center gap-2">
