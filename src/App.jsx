@@ -8,9 +8,11 @@ import {
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp, deleteDoc, doc, setDoc, getDoc } from 'firebase/firestore';
+import { Toaster, toast } from 'react-hot-toast';
 import Header from './components/layout/Header';
 import ActionPanel from './components/editor/ActionPanel';
 import HistorySidebar from './components/editor/HistorySidebar';
+import OutputCanvas from './components/editor/OutputCanvas';
 
 // --- CONFIGURACIÓN ---
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || ""; 
@@ -188,8 +190,24 @@ export default function App() {
       const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await response.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.replace(/["']/g, '');
-      if (text) setCustomIdea(text.trim());
-    } catch (err) { console.error("Excepción en trending search"); } finally { setLoadingSuggestion(false); }
+      if (text) {
+        setCustomIdea(text.trim());
+        toast.success("¡Tendencia encontrada!"); // Opcional: Feedback positivo
+      } else if (data.error) {
+         throw new Error(data.error.message || "Error desconocido de la API");
+      }
+    } catch (err) { 
+      console.error("Excepción en trending search:", err);
+      if (err.message.includes("experiencing high demand")) {
+         toast.error("Los servidores están saturados. Intenta en unos minutos.");
+      } else if (err.message.includes("Quota exceeded") || err.message.includes("rate limit")) {
+         toast.error("Demasiadas peticiones. La API gratuita requiere que esperes 1 minuto.");
+      } else {
+         toast.error("Error al buscar tendencias. Verifica tu conexión.");
+      }
+    } finally { 
+      setLoadingSuggestion(false); 
+    }
   };
 
   const generateDraft = async (idea) => {
@@ -226,30 +244,67 @@ export default function App() {
       const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await response.json();
       
-      setDraft(data.candidates?.[0]?.content?.parts?.[0]?.text || "Fallo en inferencia.");
+      // Interceptamos errores de la API antes de intentar leer el texto
+      if (data.error) {
+        throw new Error(data.error.message || "Error desconocido de la API");
+      }
+
+      const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!textOutput) {
+        throw new Error("Respuesta vacía del modelo.");
+      }
+
+      setDraft(textOutput);
       saveToHistory(idea);
 
-    } catch (err) { setDraft(t.toastError); } finally { setLoadingDraft(false); }
+   } catch (err) { 
+       console.error("Error en inferencia LLM:", err);
+       setDraft(""); 
+       
+       if (err.message.includes("experiencing high demand")) {
+         toast.error("Los servidores de IA están temporalmente saturados. Intenta más tarde.");
+       } else if (err.message.includes("API key not valid")) {
+         toast.error("La llave de acceso (API Key) es inválida o ha expirado.");
+       } else if (err.message.includes("Quota exceeded") || err.message.includes("rate limit")) {
+         toast.error("Límite de peticiones gratuitas alcanzado (HTTP 429). Espera 60 segundos.");
+       } else {
+         toast.error("No se pudo generar el contenido. Revisa tu consola para más detalles.");
+       }
+    } finally { 
+      setLoadingDraft(false); 
+    }
   };
 
   const generateSocialImage = async () => {
     if (!draft || !customIdea) return;
     setLoadingImage(true);
     setImageError("");
+    setGeneratedImage(null);
     
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-    const promptParams = `A clean, modern, friendly vector flat illustration representing the concept of: "${customIdea.substring(0, 50)}". Bright, optimistic colors, corporate memphis style, suitable for a professional blog or social media post. No text, no letters in the image. High quality.`;
+    // Generamos una semilla única basada en la idea del usuario para que la imagen sea coherente por tema
+    const seedText = encodeURIComponent(customIdea.substring(0, 15).replace(/\s+/g, ''));
     
-    try {
-      const response = await fetch(url, { 
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ instances: { prompt: promptParams }, parameters: { sampleCount: 1 } }) 
-      });
-      const data = await response.json();
-      if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
-        setGeneratedImage(`data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`);
-      } else throw new Error("Datos de imagen inválidos");
-    } catch (err) { setImageError("Fallo al contactar modelo de imagen."); } finally { setLoadingImage(false); }
+    // Utilizamos Picsum, un servicio de placeholders estable a nivel industrial, 
+    // simulando la respuesta de un LLM visual para mantener intacta la demostración de UI.
+    const imageUrl = `https://picsum.photos/seed/${seedText}/800/450`;
+
+    // Técnica de precarga asíncrona
+    const img = new Image();
+    img.src = imageUrl;
+
+    img.onload = () => {
+      setGeneratedImage(imageUrl);
+      setLoadingImage(false);
+      toast.success("Recurso visual de demostración cargado.");
+    };
+
+    img.onerror = (e) => {
+      console.error("Fallo de red en Picsum:", e);
+      setImageError("El servidor de placeholders está inalcanzable.");
+      toast.error("Fallo de red al intentar descargar la imagen.");
+      setLoadingImage(false); 
+    };
   };
 
   const copyToClipboard = () => {
@@ -334,77 +389,19 @@ export default function App() {
             />
           </div>
 
-          <div className="lg:col-span-7 flex flex-col gap-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 h-[500px] flex flex-col relative overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                   <div className={`w-2.5 h-2.5 rounded-full ${loadingDraft ? 'bg-amber-400 animate-pulse' : draft ? 'bg-green-500' : 'bg-slate-300'}`}></div>
-                   {t.resultTitle}
-                 </h2>
-                 {draft && !loadingDraft && (
-                   <button onClick={copyToClipboard} className="text-sm font-bold bg-slate-800 text-white hover:bg-slate-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm">
-                     {copied ? <CheckCircle2 className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />} {copied ? t.btnCopied : t.btnCopy}
-                   </button>
-                 )}
-              </div>
-
-              <div className="flex-1 p-6 relative flex flex-col">
-                {loadingDraft ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm z-10">
-                     <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-                     <p className="text-base font-semibold text-slate-600">{t.loadingThinking}</p>
-                  </div>
-                ) : (
-                  <textarea 
-                    className={`w-full flex-1 bg-transparent border-none resize-none focus:ring-0 leading-relaxed text-base custom-scrollbar ${formatType === 'video' ? 'font-mono text-slate-600 text-sm' : 'font-sans text-slate-700'}`} 
-                    value={draft} 
-                    onChange={(e) => setDraft(e.target.value)} 
-                    readOnly={!draft}
-                  />
-                )}
-              </div>
-            </div>
-
-            {draft && !loadingDraft && formatType === 'text' && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col sm:flex-row gap-6 items-center">
-                <div className="w-full sm:w-1/3 flex flex-col gap-3">
-                  <p className="text-sm font-semibold text-slate-700">Complemento Visual</p>
-                  <p className="text-xs text-slate-500">Un post con imagen recibe 3x más interacciones.</p>
-                  <button onClick={generateSocialImage} disabled={loadingImage} className="w-full text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:bg-slate-100 border border-blue-200 disabled:border-slate-200 disabled:text-slate-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors mt-2">
-                    {loadingImage ? <Loader2 className="w-5 h-5 animate-spin"/> : <ImageIcon className="w-5 h-5"/>} 
-                    {loadingImage ? t.loadingImage : t.btnImage}
-                  </button>
-                  {imageError && <p className="text-xs text-red-500 font-medium">{imageError}</p>}
-                </div>
-
-                <div className="w-full sm:w-2/3">
-                  <div className="w-full aspect-video bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden relative group">
-                    {loadingImage ? (
-                      <div className="text-blue-500 flex flex-col items-center gap-2">
-                        <ImageIcon className="w-8 h-8 animate-pulse" />
-                        <span className="text-xs font-semibold uppercase tracking-wider">{t.loadingImage}</span>
-                      </div>
-                    ) : generatedImage ? (
-                      <>
-                        <img src={generatedImage} alt="Generado por IA" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                          <a href={generatedImage} download="social_image.png" className="bg-white text-slate-900 font-bold px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 hover:bg-slate-100 hover:scale-105 transition-all">
-                            <Download className="w-4 h-4"/> Descargar
-                          </a>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-slate-400 flex flex-col items-center gap-2">
-                        <ImageIcon className="w-8 h-8 opacity-50" />
-                        <span className="text-xs">Sin imagen generada</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
+          <OutputCanvas 
+            t={t}
+            draft={draft}
+            setDraft={setDraft}
+            loadingDraft={loadingDraft}
+            formatType={formatType}
+            copied={copied}
+            copyToClipboard={copyToClipboard}
+            generateSocialImage={generateSocialImage}
+            loadingImage={loadingImage}
+            generatedImage={generatedImage}
+            imageError={imageError}
+          />
         </div>
       </div>
       
@@ -413,6 +410,22 @@ export default function App() {
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
       `}} />
+
+      <Toaster 
+        position="bottom-right"
+        toastOptions={{
+          duration: 5000,
+          style: {
+            background: '#1e293b',
+            color: '#fff',
+            borderRadius: '12px',
+            fontWeight: '600'
+          },
+          error: {
+            style: { background: '#ef4444' }
+          }
+        }}
+      />
     </div>
   );
 }
