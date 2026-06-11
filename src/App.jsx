@@ -13,7 +13,7 @@ import Header from './components/layout/Header';
 import ActionPanel from './components/editor/ActionPanel';
 import HistorySidebar from './components/editor/HistorySidebar';
 import OutputCanvas from './components/editor/OutputCanvas';
-import { fetchHistory, saveToHistory, deleteFromHistory } from './services/dbClient';
+import { fetchHistory, saveToHistory, deleteFromHistory, loginWithGoogle, logoutUser, subscribeToAuthChanges } from './services/dbClient';
 
 // --- CONFIGURACIÓN ---
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || ""; 
@@ -85,6 +85,7 @@ const translations = {
 };
 
 export default function App() {
+  const [authLoading, setAuthLoading] = useState(true);
   const [selectedTag, setSelectedTag] = useState("");
   const [user, setUser] = useState(null);
   const [history, setHistory] = useState([]);
@@ -144,23 +145,27 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!user || !db) return;
-    const unsubHistory = onSnapshot(query(collection(db, 'artifacts', appId, 'users', user.uid, 'topics_history')), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      data.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-      setHistory(data.slice(0, 5)); 
+    // Suscripción al estado de autenticación
+    const unsubscribe = subscribeToAuthChanges(async (currentUser) => {
+      setUser(currentUser);
+      
+      if (currentUser) {
+        // Si hay usuario, descargamos SU historial específico
+        try {
+          const data = await fetchHistory(currentUser.uid);
+          setHistory(data);
+        } catch (err) {
+          toast.error("Error de sincronización con la base de datos.");
+        }
+      } else {
+        // Si se desconecta, limpiamos la memoria volátil por seguridad
+        setHistory([]);
+      }
+      setAuthLoading(false);
     });
 
-    const loadProfile = async () => {
-      try {
-        const docSnap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'settings'));
-        if (docSnap.exists()) setUserProfile(docSnap.data());
-      } catch(e) { console.error("Error cargando perfil"); }
-    };
-    loadProfile();
-
-    return () => unsubHistory();
-  }, [user]);
+    return () => unsubscribe(); // Limpieza del listener al desmontar
+  }, []);
 
   const saveProfileSettings = async () => {
     if (!user || !db) { setShowSettings(false); return; }
@@ -293,16 +298,17 @@ export default function App() {
       
       setDraft(textOutput);
 
-     try {
-        const newId = await saveToHistory(idea, formatType, platform);
-        if (newId) {
-          setHistory(prev => [{ id: newId, topic: idea, type: formatType, platform }, ...prev]);
-        }
-      } catch (dbErr) {
-        console.error("Error capturado en catch de DB:", dbErr); // INYECTAR AQUÍ
-      }
 
-      saveToHistory(idea);
+      if (user) {
+        try {
+          const newId = await saveToHistory(idea, formatType, platform, user.uid);
+          if (newId) {
+            setHistory(prev => [{ id: newId, topic: idea, type: formatType, platform }, ...prev]);
+          }
+        } catch (dbErr) {
+          console.warn("Los datos no se sincronizaron:", dbErr);
+        }
+      }
 
    } catch (err) { 
        console.error("Error en inferencia LLM:", err);
@@ -406,7 +412,7 @@ export default function App() {
 
       <div className="max-w-[1200px] mx-auto space-y-6">
         
-        <Header lang={lang} setLang={setLang} setShowSettings={setShowSettings} t={t} />
+        <Header lang={lang} setLang={setLang} setShowSettings={setShowSettings} t={t} user={user} authLoading={authLoading}/>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
