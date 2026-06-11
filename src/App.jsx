@@ -13,6 +13,7 @@ import Header from './components/layout/Header';
 import ActionPanel from './components/editor/ActionPanel';
 import HistorySidebar from './components/editor/HistorySidebar';
 import OutputCanvas from './components/editor/OutputCanvas';
+import { fetchHistory, saveToHistory, deleteFromHistory } from './services/dbClient';
 
 // --- CONFIGURACIÓN ---
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || ""; 
@@ -117,6 +118,18 @@ export default function App() {
   const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        const data = await fetchHistory();
+        setHistory(data);
+      } catch (err) {
+        toast.error("Error de sincronización con la base de datos.");
+      }
+    };
+    loadInitialData();
+  }, []);
+
+  useEffect(() => {
     if (!auth) return;
     const initAuth = async () => {
       try {
@@ -157,9 +170,14 @@ export default function App() {
     } catch (err) { setSavingProfile(false); }
   };
 
-  const saveToHistory = async (topic) => {
-    if (!user || !db || !topic.trim()) return;
-    try { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'topics_history'), { topic, createdAt: serverTimestamp(), platform, type: formatType }); } catch (err) {}
+  const handleDelete = async (id) => {
+    try {
+      await deleteFromHistory(id);
+      setHistory(prev => prev.filter(item => item.id !== id));
+      toast.success("Registro eliminado permanentemente.");
+    } catch (err) {
+      toast.error("No se pudo eliminar el registro de la nube.");
+    }
   };
 
   const deleteFromHistory = async (docId) => {
@@ -254,8 +272,20 @@ export default function App() {
       if (!textOutput) {
         throw new Error("Respuesta vacía del modelo.");
       }
-
+      
       setDraft(textOutput);
+
+     console.log("[Rastreador 1] Invocando guardado remoto..."); // INYECTAR AQUÍ
+      try {
+        const newId = await saveToHistory(idea, formatType, platform);
+        console.log("[Rastreador 2] Respuesta de Firestore ID:", newId); // INYECTAR AQUÍ
+        if (newId) {
+          setHistory(prev => [{ id: newId, topic: idea, type: formatType, platform }, ...prev]);
+        }
+      } catch (dbErr) {
+        console.error("[Rastreador 3] Error capturado en catch de DB:", dbErr); // INYECTAR AQUÍ
+      }
+
       saveToHistory(idea);
 
    } catch (err) { 
@@ -385,7 +415,7 @@ export default function App() {
               setCustomIdea={setCustomIdea}
               setFormatType={setFormatType}
               setPlatform={setPlatform}
-              deleteFromHistory={deleteFromHistory}
+              deleteFromHistory={handleDelete}
             />
           </div>
 
