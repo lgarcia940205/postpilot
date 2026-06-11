@@ -1,6 +1,6 @@
 import React from 'react';
 import { FileText, Clapperboard, Loader2, Zap, TrendingUp, Send } from 'lucide-react';
-
+import { NICHE_TAGS } from '../../config/niches';
 
 export default function ActionPanel({
   t,
@@ -19,12 +19,7 @@ export default function ActionPanel({
   setSelectedTag
 }) {
 
-  const NICHE_TAGS = [
-    "Desarrollo Backend", 
-    "Game Design", 
-    "Gastronomía Mexicana", 
-    "Gaming y Mods"
-  ];
+
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col gap-5">
