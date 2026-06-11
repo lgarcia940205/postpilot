@@ -13,7 +13,9 @@ import Header from './components/layout/Header';
 import ActionPanel from './components/editor/ActionPanel';
 import HistorySidebar from './components/editor/HistorySidebar';
 import OutputCanvas from './components/editor/OutputCanvas';
-import { fetchHistory, saveToHistory, deleteFromHistory, loginWithGoogle, logoutUser, subscribeToAuthChanges } from './services/dbClient';
+import { fetchHistory, saveToHistory, deleteFromHistory, loginWithGoogle, logoutUser, subscribeToAuthChanges, getUserPreferences } from './services/dbClient';
+import SettingsModal from './components/layout/SettingsModal';
+import { translations } from './locales/translations';
 
 // --- CONFIGURACIÓN ---
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || ""; 
@@ -31,67 +33,18 @@ try {
   console.warn("Firebase fallback activado. Ejecutando en entorno local sin persistencia remota.");
 }
 
-const translations = {
-  es: {
-    appTitle: "Asistente Creador",
-    appSubtitle: "Tu compañero para crear publicaciones y videos geniales.",
-    formatLabel: "¿Qué deseas crear hoy?",
-    btnTextFormat: "Texto / Artículo",
-    btnVideoFormat: "Guion de Video",
-    inputPlaceholder: "¿De qué quieres hablar hoy? (Ej. Consejos para programar mejor)",
-    btnTrending: "Buscar Tendencia de tu Nicho",
-    btnGenerateText: "Generar Contenido",
-    platformLabel: "¿Dónde vas a publicar?",
-    historyLabel: "Tus Temas Anteriores",
-    emptyHistory: "Aún no tienes temas guardados.",
-    resultTitle: "Tu Contenido Listo",
-    btnCopy: "Copiar Texto",
-    btnCopied: "¡Copiado!",
-    btnImage: "Crear Imagen Acompañante",
-    loadingImage: "Renderizando imagen...",
-    settingsTitle: "Ajustes Avanzados",
-    settingsPersonality: "Tu Personalidad (Cómo quieres sonar)",
-    settingsKeys: "Conexiones de IA Pro (Opcional)",
-    btnSave: "Guardar Ajustes",
-    toastError: "Excepción en tiempo de ejecución. Verifica la conexión a la API.",
-    loadingThinking: "Procesando inferencia LLM...",
-    loadingTrending: "Ejecutando Grounding Search en tiempo real..."
-  },
-  en: {
-    appTitle: "Creator Assistant",
-    appSubtitle: "Your companion for creating awesome posts and videos.",
-    formatLabel: "What do you want to create today?",
-    btnTextFormat: "Text / Article",
-    btnVideoFormat: "Video Script",
-    inputPlaceholder: "What do you want to talk about today? (e.g., Tips for better coding)",
-    btnTrending: "Find Trend in Your Niche",
-    btnGenerateText: "Generate Content",
-    platformLabel: "Where are you posting?",
-    historyLabel: "Your Past Topics",
-    emptyHistory: "You have no saved topics yet.",
-    resultTitle: "Your Ready Content",
-    btnCopy: "Copy Text",
-    btnCopied: "Copied!",
-    btnImage: "Create Companion Image",
-    loadingImage: "Rendering image...",
-    settingsTitle: "Advanced Settings",
-    settingsPersonality: "Your Personality (How you want to sound)",
-    settingsKeys: "Pro AI Connections (Optional)",
-    btnSave: "Save Settings",
-    toastError: "Runtime exception. Check API connection.",
-    loadingThinking: "Processing LLM inference...",
-    loadingTrending: "Executing real-time Grounding Search..."
-  }
-};
-
 export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [selectedTag, setSelectedTag] = useState("");
   const [user, setUser] = useState(null);
   const [history, setHistory] = useState([]);
   
-  const [lang, setLang] = useState('es');
-  const t = translations[lang]; 
+  const [userPreferences, setUserPreferences] = useState({
+    defaultLanguage: localStorage.getItem('postpilot_lang') || 'ES',
+    customPersona: ''
+  });
+  const activeLang = userPreferences.defaultLanguage.toLowerCase();
+  const t = translations[activeLang] || translations['es'];
   
   const [customIdea, setCustomIdea] = useState("");
   const [draft, setDraft] = useState("");
@@ -111,13 +64,13 @@ export default function App() {
     video: ['TikTok/Reels', 'YouTube']
   };
   
-  const [showSettings, setShowSettings] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gemini'); 
   const [userProfile, setUserProfile] = useState({
     systemPrompt: "Eres un asistente amigable. Escribe de forma clara, usa párrafos cortos y termina con una pregunta para la audiencia.",
     keys: { openai: "", gemini: "", deepseek: "" }
   });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -125,7 +78,7 @@ export default function App() {
         const data = await fetchHistory();
         setHistory(data);
       } catch (err) {
-        toast.error("Error de sincronización con la base de datos.");
+        toast.error(t.dbSyncError);
       }
     };
     loadInitialData();
@@ -154,8 +107,13 @@ export default function App() {
         try {
           const data = await fetchHistory(currentUser.uid);
           setHistory(data);
+          const prefs = await getUserPreferences(currentUser.uid); 
+          if (prefs) { 
+            setUserPreferences(prefs); 
+            localStorage.setItem('postpilot_lang', prefs.defaultLanguage);
+          }
         } catch (err) {
-          toast.error("Error de sincronización con la base de datos.");
+          toast.error(t.dbSyncError);
         }
       } else {
         // Si se desconecta, limpiamos la memoria volátil por seguridad
@@ -180,9 +138,9 @@ export default function App() {
     try {
       await deleteFromHistory(id);
       setHistory(prev => prev.filter(item => item.id !== id));
-      toast.success("Registro eliminado permanentemente.");
+      toast.success(t.deleteSuccess);
     } catch (err) {
-      toast.error("No se pudo eliminar el registro de la nube.");
+      toast.error(t.deleteError);
     }
   };
 
@@ -230,7 +188,7 @@ export default function App() {
 
       if (text) {
         setCustomIdea(text.trim());
-        toast.success(`Tendencia obtenida para: ${activeTag}`);
+        toast.success(t.trendSuccess + activeTag);
       } else {
         throw new Error("El modelo devolvió una cadena vacía.");
       }
@@ -240,11 +198,11 @@ export default function App() {
       
       // Manejo defensivo de limitadores de red
       if (err.message.includes("experiencing high demand")) {
-         toast.error("Los servidores están saturados. Intenta en unos minutos.");
+         toast.error(t.serverOverload);
       } else if (err.message.includes("Quota exceeded") || err.message.includes("rate limit")) {
-         toast.error("Demasiadas peticiones (HTTP 429). Espera 60 segundos.");
+         toast.error(t.apiErrorQuota);
       } else {
-         toast.error("Error al buscar tendencias. Verifica tu conexión.");
+         toast.error(t.apiErrorNetwork);
       }
     } finally { 
       setLoadingSuggestion(false); 
@@ -261,18 +219,18 @@ export default function App() {
       formatInstructions = `
         FORMATO REQUERIDO: Escribe un GUION DE VIDEO (Libreto). 
         Estructura en dos partes: [VISUAL / PANTALLA] y [AUDIO / NARRADOR].
-        Incluye un "Gancho" en los primeros 3 segundos.
+        Incluye "Ganchos" visuales y timestamps
       `;
     } else {
-      formatInstructions = "FORMATO REQUERIDO: Escribe una publicación de texto estructurada con viñetas y un cierre atractivo.";
+      formatInstructions = "FORMATO REQUERIDO: Escribe una publicación de texto estructurada con viñetas y un cierre atractivo, usa un tono profesional y emojis relevantes.";
     }
 
     const systemInstruction = `
-      REGLAS DE PERSONALIDAD: ${userProfile.systemPrompt}
+      REGLAS DE PERSONALIDAD: ${userPreferences.customPersona || 'Eres un asistente experto en marketing.'}
       ${formatInstructions}
       TAREA: Crea contenido sobre: "${idea}". 
       PLATAFORMA OBJETIVO: ${platform}. 
-      IDIOMA: ${lang === 'es' ? 'Español' : 'Inglés'}.
+      IDIOMA: ${userPreferences.defaultLanguage}.
     `;
 
     try {
@@ -315,13 +273,13 @@ export default function App() {
        setDraft(""); 
        
        if (err.message.includes("experiencing high demand")) {
-         toast.error("Los servidores de IA están temporalmente saturados. Intenta más tarde.");
+         toast.error(t.serverOverload);
        } else if (err.message.includes("API key not valid")) {
-         toast.error("La llave de acceso (API Key) es inválida o ha expirado.");
+         toast.error(t.apiErrorAuth);
        } else if (err.message.includes("Quota exceeded") || err.message.includes("rate limit")) {
-         toast.error("Límite de peticiones gratuitas alcanzado (HTTP 429). Espera 60 segundos.");
+         toast.error(t.apiErrorQuota);
        } else {
-         toast.error("No se pudo generar el contenido. Revisa tu consola para más detalles.");
+         toast.error(t.apiErrorNetwork);
        }
     } finally { 
       setLoadingDraft(false); 
@@ -348,13 +306,13 @@ export default function App() {
     img.onload = () => {
       setGeneratedImage(imageUrl);
       setLoadingImage(false);
-      toast.success("Recurso visual de demostración cargado.");
+      toast.success(t.imageSuccess);
     };
 
     img.onerror = (e) => {
       console.error("Fallo de red en Picsum:", e);
-      setImageError("El servidor de placeholders está inalcanzable.");
-      toast.error("Fallo de red al intentar descargar la imagen.");
+      setImageError(t.imageErrorServer);
+      toast.error(t.imageError);
       setLoadingImage(false); 
     };
   };
@@ -374,45 +332,24 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans p-4 lg:p-8">
       
       {showSettings && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl border border-slate-100">
-            <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50/50">
-              <h2 className="text-slate-800 font-bold flex items-center gap-2 text-lg"><Settings className="w-5 h-5 text-blue-500" /> {t.settingsTitle}</h2>
-              <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-700 bg-white p-2 rounded-full shadow-sm"><X className="w-5 h-5"/></button>
-            </div>
-            
-            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-              <div className="space-y-3">
-                <label className="font-semibold text-slate-700 flex items-center gap-2"><User className="w-4 h-4 text-slate-400"/> {t.settingsPersonality}</label>
-                <textarea 
-                  value={userProfile.systemPrompt} onChange={(e) => setUserProfile({...userProfile, systemPrompt: e.target.value})}
-                  className="w-full h-24 bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-700 focus:border-blue-500 outline-none resize-none"
-                />
-              </div>
-              <div className="space-y-3 pt-4 border-t border-slate-100">
-                <label className="font-semibold text-slate-700 flex items-center gap-2"><Key className="w-4 h-4 text-slate-400"/> {t.settingsKeys}</label>
-                <div className="grid gap-3">
-                  {['openai', 'gemini', 'deepseek'].map(k => (
-                    <div key={k} className="flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
-                      <span className="w-24 text-xs font-bold text-slate-500 uppercase tracking-widest pl-3 bg-slate-100 h-full flex items-center">{k}</span>
-                      <input type="password" value={userProfile.keys[k]} onChange={(e) => setUserProfile({...userProfile, keys: {...userProfile.keys, [k]: e.target.value}})} className="flex-1 bg-transparent outline-none text-slate-700 p-2.5" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end">
-              <button onClick={saveProfileSettings} disabled={savingProfile} className="bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-xl">
-                {t.btnSave}
-              </button>
-            </div>
-          </div>
-        </div>
+        <SettingsModal
+          t={t} 
+          user={user} 
+          userPreferences={userPreferences}
+          onClose={() => setShowSettings(false)}
+          onPreferencesUpdated={(newPrefs) => {
+            setUserPreferences(prev => ({...prev, ...newPrefs}));
+            // FIX: Actualizamos el caché inmediatamente al guardar
+            if (newPrefs.defaultLanguage) {
+              localStorage.setItem('postpilot_lang', newPrefs.defaultLanguage);
+            }
+          }}
+        />
       )}
 
       <div className="max-w-[1200px] mx-auto space-y-6">
         
-        <Header lang={lang} setLang={setLang} setShowSettings={setShowSettings} t={t} user={user} authLoading={authLoading}/>
+        <Header setShowSettings={setShowSettings} t={t} user={user} authLoading={authLoading}/>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           

@@ -29,7 +29,7 @@ export default function HistorySidebar({
               <div>
                 <p className="text-sm text-slate-700 font-medium truncate w-[200px] sm:w-[250px]">{item.topic}</p>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-                  {item.type === 'video' ? 'Video' : 'Texto'} • {item.platform}
+                  {item.type === 'video' ? t.badgeVideo : t.badgeText} • {item.platform}
                 </p>
               </div>
               <button 

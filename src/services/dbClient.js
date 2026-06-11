@@ -77,6 +77,44 @@ const syncUserProfile = async (user) => {
   }
 };
 
+export const updateUserPreferences = async (uid, payload) => {
+  if (!isConfigured || !db || !uid) {
+    throw new Error("Cliente de base de datos no inicializado o UID faltante.");
+  }
+  
+  try {
+    const userDocRef = doc(db, "users", uid);
+    // La directiva merge: true es innegociable para no destruir datos preexistentes
+    await setDoc(userDocRef, {
+      ...payload,
+      updatedAt: Date.now()
+    }, { merge: true });
+    
+    return true;
+  } catch (error) {
+    console.error("Excepción al mutar preferencias en Firestore:", error);
+    throw new Error("Fallo al sincronizar la configuración en la nube.");
+  }
+};
+
+export const getUserPreferences = async (uid) => {
+  if (!isConfigured || !db || !uid) return null;
+  
+  try {
+    const userDocRef = doc(db, "users", uid);
+    const snapshot = await getDoc(userDocRef);
+    
+    if (snapshot.exists()) {
+      return snapshot.data();
+    }
+    // Si el documento no existe (usuario nuevo), devolvemos null para que la app use los valores por defecto
+    return null; 
+  } catch (error) {
+    console.error("Error al leer preferencias desde Firestore:", error);
+    throw new Error("Excepción en la lectura de perfil.");
+  }
+};
+
 // ==========================================
 // SECCIÓN: HISTORIAL (CON CONTROL DE USUARIO)
 // ==========================================

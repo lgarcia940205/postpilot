@@ -49,7 +49,7 @@ export default function OutputCanvas({
       window.URL.revokeObjectURL(url); // Liberar memoria
     } catch (error) {
       console.error("Error descargando la imagen:", error);
-      alert("No se pudo iniciar la descarga. Verifica tu conexión.");
+      alert(t.downloadError);
     }
   };
 
@@ -58,10 +58,10 @@ export default function OutputCanvas({
     
     try {
       await navigator.clipboard.writeText(draft);
-      toast.success("¡Texto copiado al portapapeles!");
+      toast.success(t.toastCopySuccess);
     } catch (err) {
       console.error("Error al copiar:", err);
-      toast.error("Tu navegador bloqueó el acceso al portapapeles.");
+      toast.error(t.toastCopyError);
     }
   };
 
@@ -88,12 +88,11 @@ export default function OutputCanvas({
                <p className="text-base font-semibold text-slate-600">{t.loadingThinking}</p>
             </div>
           ) : !draft ? (
-            /* FIX: Estado vacío elegante para escritorio */
             <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-3">
               <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
                  <span className="text-xl opacity-50">✍️</span>
               </div>
-              <p className="text-sm font-medium">El lienzo está en blanco</p>
+              <p className="text-sm font-medium">{t.emptyCanvas}</p>
             </div>
           ) : (
             <textarea 
@@ -109,8 +108,8 @@ export default function OutputCanvas({
       {draft && !loadingDraft && formatType === 'text' && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col sm:flex-row gap-6 items-center">
           <div className="w-full sm:w-1/3 flex flex-col gap-3">
-            <p className="text-sm font-semibold text-slate-700">Complemento Visual</p>
-            <p className="text-xs text-slate-500">Un post con imagen recibe 3x más interacciones.</p>
+            <p className="text-sm font-semibold text-slate-700">{t.visualAddonTitle}</p>
+            <p className="text-xs text-slate-500">{t.visualAddonDesc}</p>
             <button onClick={generateSocialImage} disabled={loadingImage} className="w-full text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:bg-slate-100 border border-blue-200 disabled:border-slate-200 disabled:text-slate-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors mt-2">
               {loadingImage ? <Loader2 className="w-5 h-5 animate-spin"/> : <ImageIcon className="w-5 h-5"/>} 
               {loadingImage ? t.loadingImage : t.btnImage}
@@ -130,14 +129,14 @@ export default function OutputCanvas({
                   <img src={generatedImage} alt="Generado por IA" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
                     <button onClick={handleDownload} className="bg-white text-slate-900 font-bold px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 hover:bg-slate-100 hover:scale-105 transition-all">
-                      <Download className="w-4 h-4"/> Descargar
+                      <Download className="w-4 h-4"/> {t.btnDownload}
                     </button>
                   </div>
                 </>
               ) : (
                 <div className="text-slate-400 flex flex-col items-center gap-2">
                   <ImageIcon className="w-8 h-8 opacity-50" />
-                  <span className="text-xs">Sin imagen generada</span>
+                  <span className="text-xs">{t.noImageGenerated}</span>
                 </div>
               )}
             </div>

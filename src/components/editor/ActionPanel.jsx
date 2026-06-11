@@ -67,15 +67,15 @@ export default function ActionPanel({
             onClick={() => generateTrendingIdea(selectedTag)} 
             disabled={loadingSuggestion || !selectedTag} 
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 border border-transparent text-white p-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center min-w-[44px]"
-            title="Sugerir tendencia basada en el tag"
+            title={t.trendBtnTitle}
           >
             {loadingSuggestion ? <Loader2 className="w-5 h-5 animate-spin"/> : <Zap className="w-5 h-5 text-amber-400"/>}
           </button>
         </div>
         {!selectedTag && (
-          <p className="text-[10px] text-amber-600 font-medium">
-            * Selecciona una categoría arriba para buscar una tendencia.
-          </p>
+          <p className="text-xs font-semibold text-amber-600 text-center mt-2 mb-4">
+            {t.trendDisclaimer}
+          </p>  
         )}
       </div>
 
