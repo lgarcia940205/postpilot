@@ -1,5 +1,6 @@
 import React from 'react';
-import { FileText, Clapperboard, Loader2, TrendingUp, Send } from 'lucide-react';
+import { FileText, Clapperboard, Loader2, Zap, TrendingUp, Send } from 'lucide-react';
+
 
 export default function ActionPanel({
   t,
@@ -13,8 +14,18 @@ export default function ActionPanel({
   generateTrendingIdea,
   loadingSuggestion,
   loadingDraft,
-  generateDraft
+  generateDraft,
+  selectedTag,
+  setSelectedTag
 }) {
+
+  const NICHE_TAGS = [
+    "Desarrollo Backend", 
+    "Game Design", 
+    "Gastronomía Mexicana", 
+    "Gaming y Mods"
+  ];
+
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col gap-5">
       
@@ -30,18 +41,49 @@ export default function ActionPanel({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <textarea 
-          value={customIdea} onChange={(e) => setCustomIdea(e.target.value)} 
-          placeholder={t.inputPlaceholder} 
-          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-base focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none h-28 resize-none text-slate-700"
-        />
-        <button onClick={generateTrendingIdea} disabled={loadingSuggestion || loadingDraft} className="self-end text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1.5 transition-colors bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg">
-          {loadingSuggestion ? <Loader2 className="w-4 h-4 animate-spin"/> : <TrendingUp className="w-4 h-4"/>} 
-          {loadingSuggestion ? t.loadingTrending : t.btnTrending}
-        </button>
+      <div className="flex flex-col gap-3">
+        <label className="text-sm font-bold text-slate-700">{t.customIdeaLabel}</label>
+        
+        <div className="flex flex-wrap gap-2 mb-1">
+          {NICHE_TAGS.map((tag) => (
+            <button
+              key={tag}
+              onClick={() => setSelectedTag(tag)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                selectedTag === tag 
+                ? 'bg-blue-600 text-white border-blue-600 shadow-md' 
+                : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-blue-300 hover:bg-blue-50'
+              }`}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <input 
+            type="text" 
+            placeholder={t.customIdeaPlaceholder}
+            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium text-slate-700"
+            value={customIdea}
+            onChange={(e) => setCustomIdea(e.target.value)}
+          />
+          <button 
+            onClick={() => generateTrendingIdea(selectedTag)} 
+            disabled={loadingSuggestion || !selectedTag} 
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 border border-transparent text-white p-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center min-w-[44px]"
+            title="Sugerir tendencia basada en el tag"
+          >
+            {loadingSuggestion ? <Loader2 className="w-5 h-5 animate-spin"/> : <Zap className="w-5 h-5 text-amber-400"/>}
+          </button>
+        </div>
+        {!selectedTag && (
+          <p className="text-[10px] text-amber-600 font-medium">
+            * Selecciona una categoría arriba para buscar una tendencia.
+          </p>
+        )}
       </div>
-      
+
       <div className="space-y-2">
         <label className="text-sm font-semibold text-slate-600">{t.platformLabel}</label>
         <div className="flex flex-wrap gap-2">

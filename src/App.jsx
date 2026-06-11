@@ -85,6 +85,7 @@ const translations = {
 };
 
 export default function App() {
+  const [selectedTag, setSelectedTag] = useState("");
   const [user, setUser] = useState(null);
   const [history, setHistory] = useState([]);
   
@@ -185,41 +186,58 @@ export default function App() {
     try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'topics_history', docId)); } catch (err) {}
   };
 
-  const generateTrendingIdea = async () => {
-    setLoadingSuggestion(true);
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey || activeKey}`;
+  const generateTrendingIdea = async (activeTag) => {
+    // Defensa estructural: Prevenir peticiones en blanco
+    if (!activeTag) return;
     
-    let nicheContext = "tecnología, innovación o creadores de contenido"; 
-    if (history.length > 0) {
-      const pastTopics = history.slice(0, 3).map(h => h.topic).join(" | ");
-      nicheContext = `el nicho específico relacionado con estos temas que el usuario suele tratar: [${pastTopics}]`;
-    }
-
-    const payload = {
-      contents: [{ 
-        parts: [{ 
-          text: `Busca en internet noticias de las últimas 24 horas sobre ${nicheContext}. Basado EXCLUSIVAMENTE en una noticia real y actual de ese nicho específico, sugiere 1 título atractivo para crear contenido en redes sociales. Idioma: ${lang === 'es' ? 'Español' : 'Inglés'}. Máximo 10 palabras. SOLO DEVUELVE EL TÍTULO.` 
-        }] 
-      }],
-      tools: [{ googleSearch: {} }] // <--- EL CAMBIO CRÍTICO ESTÁ AQUÍ
-    };
+    setLoadingSuggestion(true);
 
     try {
-      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+      // Prompt quirúrgico anclado al nicho seleccionado
+      const prompt = `Actúa como un analista de marketing de contenidos experto en el nicho de: "${activeTag}".
+      Usa la herramienta de búsqueda en internet para encontrar una tendencia actual, una noticia de última hora o un tema altamente viral estrictamente dentro de este nicho.
+      Tu salida debe ser ÚNICAMENTE un título atractivo (máximo 8 palabras) que sirva como idea central para un post. 
+      No uses comillas, no des explicaciones, no incluyas preámbulos, solo devuelve el texto del título.`;
+
+      // Estructura estricta para REST API con la herramienta de búsqueda de Google
+      const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        tools: [{ googleSearch: {} }]
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
       const data = await response.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.replace(/["']/g, '');
-      if (text) {
-        setCustomIdea(text.trim());
-        toast.success("¡Tendencia encontrada!"); // Opcional: Feedback positivo
-      } else if (data.error) {
+
+      // Intercepción de errores de la API HTTP
+      if (data.error) {
          throw new Error(data.error.message || "Error desconocido de la API");
       }
+
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.replace(/["']/g, '');
+
+      if (text) {
+        setCustomIdea(text.trim());
+        toast.success(`Tendencia obtenida para: ${activeTag}`);
+      } else {
+        throw new Error("El modelo devolvió una cadena vacía.");
+      }
+
     } catch (err) { 
       console.error("Excepción en trending search:", err);
+      
+      // Manejo defensivo de limitadores de red
       if (err.message.includes("experiencing high demand")) {
          toast.error("Los servidores están saturados. Intenta en unos minutos.");
       } else if (err.message.includes("Quota exceeded") || err.message.includes("rate limit")) {
-         toast.error("Demasiadas peticiones. La API gratuita requiere que esperes 1 minuto.");
+         toast.error("Demasiadas peticiones (HTTP 429). Espera 60 segundos.");
       } else {
          toast.error("Error al buscar tendencias. Verifica tu conexión.");
       }
@@ -275,15 +293,13 @@ export default function App() {
       
       setDraft(textOutput);
 
-     console.log("[Rastreador 1] Invocando guardado remoto..."); // INYECTAR AQUÍ
-      try {
+     try {
         const newId = await saveToHistory(idea, formatType, platform);
-        console.log("[Rastreador 2] Respuesta de Firestore ID:", newId); // INYECTAR AQUÍ
         if (newId) {
           setHistory(prev => [{ id: newId, topic: idea, type: formatType, platform }, ...prev]);
         }
       } catch (dbErr) {
-        console.error("[Rastreador 3] Error capturado en catch de DB:", dbErr); // INYECTAR AQUÍ
+        console.error("Error capturado en catch de DB:", dbErr); // INYECTAR AQUÍ
       }
 
       saveToHistory(idea);
@@ -408,6 +424,8 @@ export default function App() {
               loadingSuggestion={loadingSuggestion}
               loadingDraft={loadingDraft}
               generateDraft={generateDraft}
+              selectedTag={selectedTag}
+              setSelectedTag={setSelectedTag}
             />
             <HistorySidebar 
               t={t}
