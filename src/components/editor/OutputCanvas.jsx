@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader2, CheckCircle2, Copy, Image as ImageIcon, Download } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 export default function OutputCanvas({
   t,
@@ -40,6 +41,19 @@ export default function OutputCanvas({
     }
   };
 
+  const handleCopy = async () => {
+    // Si no hay texto generado, abortamos silenciosamente
+    if (!generatedDraft) return; 
+    
+    try {
+      await navigator.clipboard.writeText(generatedDraft);
+      toast.success("¡Texto copiado al portapapeles!");
+    } catch (err) {
+      console.error("Error al copiar:", err);
+      toast.error("Tu navegador bloqueó el acceso al portapapeles.");
+    }
+  };
+
   return (
     <div className="lg:col-span-7 flex flex-col gap-6">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 h-[500px] flex flex-col relative overflow-hidden">
@@ -49,7 +63,7 @@ export default function OutputCanvas({
              {t.resultTitle}
            </h2>
            {draft && !loadingDraft && (
-             <button onClick={copyToClipboard} className="text-sm font-bold bg-slate-800 text-white hover:bg-slate-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm">
+             <button onClick={handleCopy} className="text-sm font-bold bg-slate-800 text-white hover:bg-slate-700 px-4 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm">
                {copied ? <CheckCircle2 className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />} {copied ? t.btnCopied : t.btnCopy}
              </button>
            )}
